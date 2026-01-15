@@ -68,7 +68,6 @@ export const clampPosition = (
   gridCols: number = GRID_COLUMNS
 ): Position => {
   const maxX = Math.max(0, gridCols - size.width);
-  const maxY = Math.max(0, position.y); // Y can be any positive value
 
   return {
     x: Math.max(0, Math.min(maxX, position.x)),

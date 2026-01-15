@@ -1,4 +1,4 @@
-import React, { ReactNode, useMemo } from 'react'
+import React, { ReactNode } from 'react'
 import { useDrop } from 'react-dnd'
 import { Widget } from '../types'
 import { GRID_COLUMNS, GRID_GAP } from '../constants/grid'
