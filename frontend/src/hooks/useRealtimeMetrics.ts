@@ -6,7 +6,7 @@ export const useRealtimeMetrics = () => {
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const intervalRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Initial fetch
@@ -26,7 +26,7 @@ export const useRealtimeMetrics = () => {
     fetchMetrics()
 
     // Poll for updates every 5 seconds (replacing WebSocket)
-    intervalRef.current = setInterval(() => {
+    intervalRef.current = window.setInterval(() => {
       metricsApi.getAll()
         .then((data) => {
           setMetrics(data)
@@ -41,7 +41,7 @@ export const useRealtimeMetrics = () => {
     // Cleanup
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+        window.clearInterval(intervalRef.current)
       }
     }
   }, []) // Run only once on mount
