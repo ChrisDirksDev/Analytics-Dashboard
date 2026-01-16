@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Metric } from '../types'
 import { metricsApi } from '../services/api'
-import { wsService } from '../services/websocket'
 
 export const useRealtimeMetrics = () => {
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Initial fetch
@@ -25,31 +25,26 @@ export const useRealtimeMetrics = () => {
 
     fetchMetrics()
 
-    // Set up WebSocket connection
-    wsService.connect()
-
-    // Subscribe to real-time updates
-    const unsubscribe = wsService.on('metric-update', (updatedMetric: Metric) => {
-      setMetrics(prev => {
-        const index = prev.findIndex(m => m.id === updatedMetric.id)
-        if (index >= 0) {
-          // Update existing metric
-          const newMetrics = [...prev]
-          newMetrics[index] = updatedMetric
-          return newMetrics
-        } else {
-          // Add new metric
-          return [...prev, updatedMetric]
-        }
-      })
-    })
+    // Poll for updates every 5 seconds (replacing WebSocket)
+    intervalRef.current = setInterval(() => {
+      metricsApi.getAll()
+        .then((data) => {
+          setMetrics(data)
+          setError(null)
+        })
+        .catch((err) => {
+          // Silently log polling errors to avoid error state churn
+          console.warn('Failed to fetch metrics update:', err)
+        })
+    }, 5000)
 
     // Cleanup
     return () => {
-      unsubscribe()
-      wsService.disconnect()
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
     }
-  }, [])
+  }, []) // Run only once on mount
 
   return { metrics, loading, error }
 }

@@ -3,13 +3,17 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-// Create connection pool
+// Validate DATABASE_URL is provided
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL environment variable is required. ' +
+    'Format: postgresql://user:password@host:port/database'
+  )
+}
+
+// Create connection pool using connection string
 export const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'analytics_dashboard',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
+  connectionString: process.env.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
