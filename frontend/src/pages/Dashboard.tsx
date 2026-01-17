@@ -11,7 +11,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { DraggableWidget } from "../components/DraggableWidget";
 import { DroppableArea } from "../components/DroppableArea";
 import { exportDashboardToPDF } from "../utils/pdfExport";
-import { Widget, ChartType } from "../types";
+import { Widget, ChartType, ChartConfigData } from "../types";
 import { format, subDays } from "date-fns";
 import { GRID_COLUMNS, GRID_GAP } from "../constants/grid";
 import { isValidPosition, hasCollision, findNextAvailablePosition } from "../utils/gridUtils";
@@ -215,7 +215,7 @@ const Dashboard: React.FC = () => {
         const chartTypeIndex = existingCharts.length % chartTypes.length;
         const chartType = chartTypes[chartTypeIndex];
 
-        let chartData: any;
+        let chartData: ChartConfigData;
         let chartTitle: string;
         switch (chartType) {
           case "line":
