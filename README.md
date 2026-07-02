@@ -53,7 +53,7 @@ claims.
 
 ## Run locally
 
-Requirements: Node.js 18+, Python 3.9+, and Docker Compose.
+Requirements: Node.js 24, Python 3.9+, and Docker Compose.
 
 ```bash
 npm run setup

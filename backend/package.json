@@ -2,6 +2,9 @@
   "name": "analytics-dashboard-backend",
   "version": "1.0.0",
   "description": "API for the explainable retail analytics case study",
+  "engines": {
+    "node": "24.x"
+  },
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",

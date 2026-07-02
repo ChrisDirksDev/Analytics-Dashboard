@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Explainable retail analytics and forecasting case study",
   "engines": {
-    "node": ">=20 <23"
+    "node": "24.x"
   },
   "scripts": {
     "dev:frontend": "npm --prefix frontend run dev",
