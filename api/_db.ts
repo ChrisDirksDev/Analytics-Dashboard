@@ -8,7 +8,14 @@ function mongoClient(): Promise<MongoClient> {
 
   // Cache the connection promise across warm serverless invocations.
   if (!clientPromise) {
-    clientPromise = new MongoClient(uri, { maxPoolSize: 5 }).connect()
+    clientPromise = new MongoClient(uri, {
+      maxPoolSize: 5,
+      serverSelectionTimeoutMS: 5_000,
+    }).connect().catch((error) => {
+      // Let a later invocation retry after a transient connection failure.
+      clientPromise = undefined
+      throw error
+    })
   }
   return clientPromise
 }

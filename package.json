@@ -2,6 +2,9 @@
   "name": "retail-analytics-case-study",
   "version": "1.0.0",
   "description": "Explainable retail analytics and forecasting case study",
+  "engines": {
+    "node": ">=20 <23"
+  },
   "scripts": {
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
@@ -15,11 +18,12 @@
     "db:seed": "npm --prefix backend run seed",
     "db:setup": "npm run db:up && npm run db:migrate && npm run db:seed",
     "setup": "npm run install:all && npm run python:setup && npm run db:setup",
-    "build": "npm run build:frontend && npm run build:backend",
+    "build": "npm run build:frontend && npm run build:backend && npm run typecheck:api",
     "test": "npm run test:python && npm run test:api && npm run test:frontend",
     "test:python": "PYTHONPATH=python-ml python-ml/.venv/bin/pytest -q python-ml/tests",
     "test:api": "backend/node_modules/.bin/tsx --test api/_analytics.test.ts",
     "test:frontend": "npm --prefix frontend test",
+    "typecheck:api": "tsc --project api/tsconfig.json",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "npm --prefix backend run build"
   },

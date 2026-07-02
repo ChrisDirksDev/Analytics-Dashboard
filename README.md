@@ -90,6 +90,18 @@ your MongoDB connection string and, optionally, `MONGODB_DB` (defaults to
 `npm run db:seed` to load the artifact. Local development uses the same artifact
 and contract through Express.
 
+For a Vercel deployment:
+
+1. Import the repository with the project root left at the repository root.
+2. Add `MONGODB_URI` and `MONGODB_DB` to the Production and Preview environments.
+3. Allow connections from Vercel in the MongoDB provider's network-access rules.
+4. Seed the database once from a trusted machine; serverless functions only read
+   the resulting `analytics_artifacts` collection.
+
+Vercel installs both root and frontend dependencies, builds the Vite app, and
+deploys each file in `api/` as a Node.js function. The SPA fallback is applied
+only after filesystem routes, so `/api/*` continues to resolve to those functions.
+
 ## Data license and attribution
 
 Chen, D. (2015). *Online Retail* [Dataset]. UCI Machine Learning Repository.

@@ -1,4 +1,4 @@
-import { getDatabase } from './db'
+import { getDatabase } from './_db'
 
 export type Daily={date:string;country:string;revenue:number;orders:number;customers:number;newCustomers:number;returningCustomers:number}
 export type Product={date:string;country:string;stock_code:string;description:string;revenue:number;units:number}
