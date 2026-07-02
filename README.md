@@ -5,6 +5,16 @@ A portfolio-grade analytics product built from 530,104 cleaned transactions in t
 The dashboard presents historical 2010–2011 activity honestly: no random chart
 values, seeded prose, hidden model fallbacks, or invented confidence scores.
 
+**Live demo:** [analytics-dashboard-jade-ten.vercel.app](https://analytics-dashboard-jade-ten.vercel.app/)
+
+## Screenshots
+
+![Retail analytics dashboard overview](docs/screenshots/top.png)
+
+![Revenue analytics graph](docs/screenshots/graph.png)
+
+![Forecast model details](docs/screenshots/model.png)
+
 ## Product story
 
 The original demo exposed isolated metric snapshots and generated both its charts
