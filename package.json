@@ -3,13 +3,21 @@
   "version": "1.0.0",
   "description": "AI-Powered Analytics Dashboard - Real-time analytics platform with ML insights",
   "scripts": {
-    "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend": "cd backend && npm run dev",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
-    "build": "cd frontend && npm install && npm run build",
-    "build:frontend": "cd frontend && npm run build",
-    "build:backend": "cd backend && npm run build"
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:ml": "python-ml/.venv/bin/python python-ml/app.py",
+    "dev": "concurrently --kill-others-on-fail --names api,web,ml \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:ml\"",
+    "install:all": "npm install && npm --prefix frontend install && npm --prefix backend install",
+    "python:setup": "python3 -m venv python-ml/.venv && python-ml/.venv/bin/python -m pip install --upgrade pip && python-ml/.venv/bin/pip install -r python-ml/requirements.txt",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:migrate": "npm --prefix backend run migrate",
+    "db:seed": "npm --prefix backend run seed",
+    "db:setup": "npm run db:up && npm run db:migrate && npm run db:seed",
+    "setup": "npm run install:all && npm run python:setup && npm run db:setup",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build"
   },
   "keywords": ["analytics", "dashboard", "ml", "react", "typescript"],
   "author": "",
@@ -27,4 +35,3 @@
     "typescript": "^5.2.2"
   }
 }
-

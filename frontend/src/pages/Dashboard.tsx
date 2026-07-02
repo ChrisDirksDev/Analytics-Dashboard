@@ -11,7 +11,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { DraggableWidget } from "../components/DraggableWidget";
 import { DroppableArea } from "../components/DroppableArea";
 import { exportDashboardToPDF } from "../utils/pdfExport";
-import { Widget, ChartType, ChartConfigData } from "../types";
+import { Widget, ChartType, ChartConfigData, ChartData, ScatterData, HeatmapData } from "../types";
 import { format, subDays } from "date-fns";
 import { GRID_COLUMNS, GRID_GAP } from "../constants/grid";
 import { isValidPosition, hasCollision, findNextAvailablePosition } from "../utils/gridUtils";
@@ -305,6 +305,13 @@ const Dashboard: React.FC = () => {
         const chartConfig = widget.config;
         switch (chartConfig.type) {
           case "line":
+          case "bar": {
+            // line and bar charts use ChartData
+            const chartData = chartConfig.data;
+            if (!('labels' in chartData)) {
+              return null;
+            }
+            const typedData = chartData as ChartData;
             return (
               <DraggableWidget
                 key={widget.id}
@@ -312,31 +319,25 @@ const Dashboard: React.FC = () => {
                 onRemove={handleRemoveWidget}
               >
                 <div className="card">
-                  <LineChart
-                    data={chartConfig.data}
-                    title={widget.title}
-                    height={200}
-                  />
+                  {chartConfig.type === "line" ? (
+                    <LineChart
+                      data={typedData}
+                      title={widget.title}
+                      height={200}
+                    />
+                  ) : (
+                    <BarChart
+                      data={typedData}
+                      title={widget.title}
+                      height={200}
+                    />
+                  )}
                 </div>
               </DraggableWidget>
             );
-          case "bar":
-            return (
-              <DraggableWidget
-                key={widget.id}
-                widget={widget}
-                onRemove={handleRemoveWidget}
-              >
-                <div className="card">
-                  <BarChart
-                    data={chartConfig.data}
-                    title={widget.title}
-                    height={200}
-                  />
-                </div>
-              </DraggableWidget>
-            );
-          case "scatter":
+          }
+          case "scatter": {
+            const chartData = chartConfig.data as ScatterData;
             return (
               <DraggableWidget
                 key={widget.id}
@@ -345,14 +346,16 @@ const Dashboard: React.FC = () => {
               >
                 <div className="card">
                   <ScatterChart
-                    data={chartConfig.data}
+                    data={chartData}
                     title={widget.title}
                     height={200}
                   />
                 </div>
               </DraggableWidget>
             );
-          case "heatmap":
+          }
+          case "heatmap": {
+            const chartData = chartConfig.data as HeatmapData;
             return (
               <DraggableWidget
                 key={widget.id}
@@ -361,13 +364,14 @@ const Dashboard: React.FC = () => {
               >
                 <div className="card">
                   <HeatmapChart
-                    data={chartConfig.data}
+                    data={chartData}
                     title={widget.title}
                     height={200}
                   />
                 </div>
               </DraggableWidget>
             );
+          }
           default:
             return null;
         }

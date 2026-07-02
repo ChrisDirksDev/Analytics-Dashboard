@@ -70,19 +70,29 @@ export interface Prediction {
 
 export type ChartConfigData = ChartData | ScatterData | HeatmapData
 
-export type WidgetConfig =
-  | { metricId: string } // for 'metric' type
-  | { type: ChartType; data: ChartConfigData } // for 'chart' type
-  | { insightId: string } // for 'ml-insight' type
-
-export interface Widget {
+export type BaseWidget = {
   id: string
-  type: 'metric' | 'chart' | 'ml-insight'
   title: string
   position: { x: number; y: number }
   size: { width: number; height: number }
-  config: WidgetConfig
 }
+
+export type MetricWidget = BaseWidget & {
+  type: 'metric'
+  config: { metricId: string }
+}
+
+export type ChartWidget = BaseWidget & {
+  type: 'chart'
+  config: { type: ChartType; data: ChartConfigData }
+}
+
+export type MLInsightWidget = BaseWidget & {
+  type: 'ml-insight'
+  config: { insightId: string }
+}
+
+export type Widget = MetricWidget | ChartWidget | MLInsightWidget
 
 export interface DashboardLayout {
   widgets: Widget[]

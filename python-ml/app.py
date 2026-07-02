@@ -54,7 +54,7 @@ def predict():
     ]
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         metrics = data.get('metrics', [])
         
         if not metrics:
@@ -89,7 +89,7 @@ def detect_anomalies():
     ]
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         values = data.get('data', [])
         
         if not values or not isinstance(values, list):
@@ -126,4 +126,3 @@ if __name__ == '__main__':
     print(f'🔍 Anomaly detection: Ready')
     
     app.run(host='0.0.0.0', port=port, debug=debug)
-

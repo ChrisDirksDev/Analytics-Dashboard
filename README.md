@@ -1,226 +1,116 @@
 # AI-Powered Analytics Dashboard
 
-A real-time analytics platform featuring machine learning insights, interactive charts, and predictive modeling. Built with React, TypeScript, Node.js, and Python.
+A local analytics demo with a React dashboard, PostgreSQL-backed Express API,
+and Python prediction and anomaly-detection service.
 
-## 🚀 Features
+## What runs locally
 
-- **Real-time Metrics**: Live data updates via WebSockets
-- **Interactive Charts**: Line, bar, scatter, and heatmap visualizations
-- **ML Insights**: Predictive modeling and anomaly detection powered by Python/TensorFlow
-- **Customizable Dashboard**: Drag-and-drop widget arrangement
-- **Automated Reports**: PDF export with charts and ML insights
-- **Theme Support**: Light/Dark mode with dynamic color theming
+| Service | Address | Purpose |
+| --- | --- | --- |
+| React/Vite | http://localhost:3000 | Dashboard UI and `/api` development proxy |
+| Node/Express | http://localhost:5000 | Metrics, insights, and ML API |
+| Python/Flask | http://localhost:8000 | Prediction and anomaly models |
+| PostgreSQL | localhost:5433 | Development data store |
 
-## 📋 Prerequisites
+PostgreSQL intentionally uses host port 5433 so it does not collide with a
+system PostgreSQL installation on the default port.
 
-- Node.js (v18+)
-- Python (v3.9+)
-- PostgreSQL (v14+)
-- npm or yarn
+## Prerequisites
 
-## 🛠️ Installation
+- Node.js 18 or newer
+- Python 3.9 or newer with the `venv` module (`python3-venv` on Debian/Ubuntu)
+- Docker with Docker Compose
 
-1. **Install all dependencies:**
-   ```bash
-   npm run install:all
-   ```
+## First-time setup
 
-2. **Set up PostgreSQL database:**
-   ```bash
-   # Create database
-   createdb analytics_dashboard
-
-   # Run migrations
-   cd backend
-   npm run migrate
-
-   # Seed data
-   npm run seed
-   ```
-
-3. **Set up Python ML service:**
-   ```bash
-   cd python-ml
-   pip install -r requirements.txt
-   ```
-
-4. **Configure environment variables:**
-   - Copy `backend/.env.example` to `backend/.env` and fill in values
-   - Copy `python-ml/.env.example` to `python-ml/.env` if needed
-
-## 🏃 Running the Application
-
-**Development mode (runs both frontend and backend):**
 ```bash
+npm run setup
+```
+
+This installs all Node dependencies, creates `python-ml/.venv`, starts the
+database container, applies the schema, and loads the explicit demo seed data.
+Seeding resets the dashboard tables, so run it only when that is intended.
+
+If you prefer to perform each stage separately:
+
+```bash
+npm run install:all
+npm run python:setup
+npm run db:setup
+```
+
+The checked-in `.env.example` files document every setting. Development
+defaults already match Docker Compose; copy an example to `.env` only when you
+need to recreate or customize a local file.
+
+## Run the application
+
+Ensure the database is running, then launch all application services:
+
+```bash
+npm run db:up
 npm run dev
 ```
 
-**Or run separately:**
+Press Ctrl+C once to stop the frontend, API, and ML processes together. The
+database remains available between sessions. Stop it separately with:
+
 ```bash
-# Terminal 1: Backend
-npm run dev:backend
-
-# Terminal 2: Frontend
-npm run dev:frontend
-
-# Terminal 3: Python ML Service
-cd python-ml
-python app.py
+npm run db:down
 ```
 
-## 📁 Project Structure
+## Common commands
 
-```
-.
-├── frontend/          # React + TypeScript frontend
-│   ├── src/
-│   │   ├── components/    # Reusable UI components
-│   │   ├── features/      # Feature-specific components
-│   │   ├── hooks/         # Custom React hooks
-│   │   ├── services/      # API and WebSocket services
-│   │   ├── types/         # TypeScript type definitions
-│   │   └── utils/         # Utility functions
-│   └── package.json
-├── backend/          # Node.js API server
-│   ├── src/
-│   │   ├── routes/        # API routes
-│   │   ├── models/        # Database models
-│   │   ├── services/      # Business logic
-│   │   ├── websocket/     # WebSocket handlers
-│   │   └── utils/         # Utility functions
-│   └── package.json
-├── python-ml/        # Python ML microservice
-│   ├── models/           # ML model definitions
-│   ├── services/         # ML prediction services
-│   └── app.py            # Flask/FastAPI server
-└── database/         # Database scripts
-    ├── schema.sql        # Database schema
-    └── seed.sql          # Seed data
-```
-
-## 🏗️ Architecture
-
-- **Frontend**: React with TypeScript, Chart.js for visualizations, Tailwind CSS for styling
-- **Backend**: Node.js/Express API with WebSocket support for real-time updates
-- **ML Service**: Python microservice using TensorFlow/scikit-learn for predictions
-- **Database**: PostgreSQL for persistent data storage
-- **Communication**: REST API between frontend-backend, REST/child_process between backend-Python
-
-## 📝 API Endpoints
-
-### Backend API (Node.js)
-
-#### Metrics
-- `GET /api/metrics` - Get all metrics
-- `GET /api/metrics/:id` - Get specific metric
-- `PUT /api/metrics/:id` - Update metric value
-- WebSocket: `metric-update` - Real-time metric updates
-
-#### ML Insights
-- `GET /api/ml/insights` - Get ML insights summary
-- `POST /api/ml/predict` - Get predictions for metrics
-  ```json
-  {
-    "metricIds": ["metric-1", "metric-2"]
-  }
-  ```
-- `POST /api/ml/anomaly-detection` - Detect anomalies in data
-  ```json
-  {
-    "data": [100, 105, 98, 150, 102]
-  }
-  ```
-
-### Python ML Service
-
-- `GET /health` - Health check
-- `POST /predict` - Generate predictions
-- `POST /detect-anomalies` - Detect anomalies
-- `GET /insights` - Get service status
-
-## 🎨 Customization
-
-The dashboard supports:
-- Drag-and-drop widget rearrangement
-- Add/remove widgets dynamically
-- Theme customization (light/dark mode)
-- Export dashboard as PDF
-
-## 🔧 Development
-
-### Frontend Development
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run dev              # frontend + API + ML service
+npm run build            # production TypeScript/Vite builds
+npm run db:migrate       # apply idempotent schema changes
+npm run db:seed          # reset and reload demo records
+npm run dev:frontend     # run only Vite
+npm run dev:backend      # run only Express
+npm run dev:ml           # run only Flask using the project venv
 ```
 
-### Backend Development
-```bash
-cd backend
-npm install
-npm run dev
+## API
+
+### Health
+
+- `GET /api/health`
+- Python service: `GET http://localhost:8000/health`
+
+### Metrics and insights
+
+- `GET /api/metrics`
+- `GET /api/metrics/:id`
+- `PUT /api/metrics/:id` with one or more of `value`, `change`, and `trend`
+- `GET /api/ml/insights`
+
+### Machine learning
+
+```http
+POST /api/ml/predict
+Content-Type: application/json
+
+{"metricIds":["metric-id"]}
 ```
 
-### Python ML Service
-```bash
-cd python-ml
-pip install -r requirements.txt
-python app.py
+```http
+POST /api/ml/anomaly-detection
+Content-Type: application/json
+
+{"data":[100,105,98,150,102]}
 ```
 
-## 📊 Features in Detail
+The Node API validates requests, loads metric values from PostgreSQL, and calls
+the Python service. If Python is unavailable, ML endpoints return `502` rather
+than fabricated data.
 
-### Real-time Updates
-- WebSocket connection for live metric updates
-- Automatic refresh every 5 seconds
-- Visual indicators for trend changes
+## Troubleshooting
 
-### ML Insights
-- **Predictions**: Linear regression-based forecasting
-- **Anomaly Detection**: Z-score and Isolation Forest methods
-- **Confidence Scores**: Each insight includes confidence level
-
-### Chart Types
-- **Line Charts**: Time series data visualization
-- **Bar Charts**: Comparative data display
-- **Scatter Charts**: Correlation analysis
-- **Heatmaps**: Multi-dimensional data representation
-
-### Dashboard Customization
-- Drag widgets to rearrange
-- Add new widgets from header menu
-- Remove widgets with hover controls
-- Export current layout as PDF
-
-## 🐛 Troubleshooting
-
-### Database Connection Issues
-- Ensure PostgreSQL is running
-- Check `.env` file has correct credentials
-- Verify database exists: `createdb analytics_dashboard`
-
-### ML Service Not Responding
-- Check Python service is running on port 8000
-- Verify dependencies: `pip install -r requirements.txt`
-- Check logs for errors
-
-### WebSocket Connection Failed
-- Ensure backend is running
-- Check CORS settings in backend
-- Verify frontend proxy configuration
-
-## 📄 License
-
-MIT
-
-## 🙏 Acknowledgments
-
-Built with:
-- React + TypeScript
-- Chart.js for visualizations
-- Node.js + Express
-- Python + scikit-learn
-- PostgreSQL
-- Socket.io for real-time updates
-
+- `docker: command not found`: install Docker and its Compose plugin, then rerun
+  `npm run db:setup`.
+- API exits on startup: verify the database is healthy with `docker compose ps`
+  and confirm `backend/.env` uses port 5433.
+- ML service will not start: rerun `npm run python:setup`.
+- Dashboard stays on loading: check `http://localhost:5000/api/health`, then the
+  API terminal for database errors.
