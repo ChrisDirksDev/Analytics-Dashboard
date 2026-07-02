@@ -1,109 +1,14 @@
-// Core data types
-export interface Metric {
-  id: string
-  name: string
-  value: number
-  unit: string
-  change: number // percentage change
-  trend: 'up' | 'down' | 'stable'
-  timestamp: string
+export type KpiKey = 'revenue' | 'orders' | 'customers' | 'averageOrderValue'
+export interface DashboardData {
+  meta: { name:string; doi:string; license:string; sourceUrl:string; startDate:string; endDate:string; from:string; to:string; country:string; generatedAt:string; cleanTransactions:number; isStale:boolean }
+  filters: { countries:string[] }
+  kpis: Array<{key:KpiKey;value:number;comparisonPercent:number|null}>
+  revenueSeries:Array<{date:string;revenue:number}>
+  forecasts:Array<{date:string;predicted:number;lowerBound:number;upperBound:number}>
+  anomalies:Array<{date:string;observed:number;expected:number;deviationPercent:number;severity:'medium'|'high';method:string}>
+  countries:Array<{country:string;revenue:number;orders:number}>
+  customerMix:{new:number;returning:number}
+  products:Array<{stockCode:string;name:string;revenue:number;units:number}>
+  insights:Array<{id:string;kind:'trend'|'anomaly'|'forecast';title:string;summary:string;evidence:string;period:string;modelVersion:string}>
 }
-
-export interface ChartData {
-  labels: string[]
-  datasets: {
-    label: string
-    data: number[]
-    backgroundColor?: string | string[]
-    borderColor?: string
-    borderWidth?: number
-  }[]
-}
-
-export interface ScatterDataPoint {
-  x: number
-  y: number
-}
-
-export interface ScatterData {
-  datasets: {
-    label: string
-    data: ScatterDataPoint[]
-    backgroundColor?: string
-  }[]
-}
-
-export interface HeatmapData {
-  labels: string[]
-  datasets: {
-    label: string
-    data: number[][]
-  }[]
-}
-
-export interface MLInsight {
-  id: string
-  type: 'prediction' | 'anomaly' | 'trend'
-  title: string
-  description: string
-  confidence: number
-  timestamp: string
-  data?: unknown
-}
-
-export interface Anomaly {
-  id: string
-  metricId: string
-  value: number
-  expectedValue: number
-  severity: 'low' | 'medium' | 'high'
-  timestamp: string
-}
-
-export interface Prediction {
-  metricId: string
-  currentValue: number
-  predictedValue: number
-  confidence: number
-  timeframe: string
-}
-
-export type ChartConfigData = ChartData | ScatterData | HeatmapData
-
-export type BaseWidget = {
-  id: string
-  title: string
-  position: { x: number; y: number }
-  size: { width: number; height: number }
-}
-
-export type MetricWidget = BaseWidget & {
-  type: 'metric'
-  config: { metricId: string }
-}
-
-export type ChartWidget = BaseWidget & {
-  type: 'chart'
-  config: { type: ChartType; data: ChartConfigData }
-}
-
-export type MLInsightWidget = BaseWidget & {
-  type: 'ml-insight'
-  config: { insightId: string }
-}
-
-export type Widget = MetricWidget | ChartWidget | MLInsightWidget
-
-export interface DashboardLayout {
-  widgets: Widget[]
-}
-
-export type ChartType = 'line' | 'bar' | 'scatter' | 'heatmap'
-
-export interface Theme {
-  mode: 'light' | 'dark'
-  primaryColor: string
-  backgroundColor: string
-  textColor: string
-}
-
+export interface ModelCard { version:string;algorithm:string;trainingWindow:string;forecastHorizonDays:number;mae:number;wape:number;baselineMae:number;baselineWape:number;lastTrainedAt:string;baseline:string;limitations:string[] }

@@ -1,0 +1,19 @@
+import {cleanup,render,screen} from '@testing-library/react'
+import {beforeEach,describe,expect,it,vi} from 'vitest'
+import App from '../App'
+import * as service from '../services/api'
+import type {DashboardData,ModelCard} from '../types'
+
+vi.mock('../services/api')
+vi.mock('../components/PortfolioCharts',()=>({RevenueChart:()=> <div>Revenue visualization</div>,CountryChart:()=> <div>Country visualization</div>}))
+vi.mock('react-chartjs-2',()=>({Line:()=> <div>Revenue visualization</div>,Bar:()=> <div>Country visualization</div>}))
+
+const dashboard:DashboardData={meta:{name:'UCI Online Retail',doi:'10.1/test',license:'CC BY 4.0',sourceUrl:'https://example.com',startDate:'2011-01-01',endDate:'2011-01-02',from:'2011-01-01',to:'2011-01-02',country:'All',generatedAt:'2011-01-02T00:00:00Z',cleanTransactions:100,isStale:false},filters:{countries:['UK']},kpis:[{key:'revenue',value:250,comparisonPercent:null},{key:'orders',value:5,comparisonPercent:null},{key:'customers',value:1,comparisonPercent:null},{key:'averageOrderValue',value:50,comparisonPercent:null}],revenueSeries:[{date:'2011-01-01',revenue:100}],forecasts:[],anomalies:[],countries:[{country:'UK',revenue:250,orders:5}],customerMix:{new:1,returning:0},products:[{stockCode:'A',name:'Product A',revenue:100,units:2}],insights:[]}
+const model:ModelCard={version:'v1',algorithm:'Test regression',trainingWindow:'2011',forecastHorizonDays:30,mae:10,wape:20,baselineMae:15,baselineWape:30,lastTrainedAt:'2011-01-02',baseline:'Seasonal baseline',limitations:['Historical only']}
+
+describe('Dashboard',()=>{
+ beforeEach(()=>{cleanup();vi.clearAllMocks();localStorage.clear();vi.mocked(service.errorMessage).mockReturnValue('offline')})
+ it('renders trustworthy dataset and KPI context',async()=>{vi.mocked(service.getDashboard).mockResolvedValue(dashboard);vi.mocked(service.getModelCard).mockResolvedValue(model);render(<App/>);expect(await screen.findByRole('heading',{name:'What shaped the year in retail?'})).toBeInTheDocument();expect(screen.getByText('Sales revenue')).toBeInTheDocument();expect(screen.getByText(/CC BY 4.0/)).toBeInTheDocument();expect(screen.getByText(/withheld for filtered views/)).toBeInTheDocument()})
+ it('renders a recoverable API error',async()=>{vi.mocked(service.getDashboard).mockRejectedValue(new Error('offline'));vi.mocked(service.getModelCard).mockResolvedValue(model);render(<App/>);expect(await screen.findByRole('alert')).toHaveTextContent('We couldn’t load the analysis');expect(screen.getByRole('button',{name:'Try again'})).toBeEnabled()})
+ it('keeps analytics available when model metadata fails',async()=>{vi.mocked(service.getDashboard).mockResolvedValue(dashboard);vi.mocked(service.getModelCard).mockRejectedValue(new Error('model offline'));render(<App/>);expect(await screen.findByText('Model diagnostics are temporarily unavailable.')).toBeInTheDocument();expect(screen.getByText('Sales revenue')).toBeInTheDocument()})
+})

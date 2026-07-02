@@ -1,116 +1,96 @@
-# AI-Powered Analytics Dashboard
+# Retail Analytics — an explainable ML case study
 
-A local analytics demo with a React dashboard, PostgreSQL-backed Express API,
-and Python prediction and anomaly-detection service.
+A portfolio-grade analytics product built from 530,104 cleaned transactions in the
+[UCI Online Retail dataset](https://archive.ics.uci.edu/dataset/352/online-retail).
+The dashboard presents historical 2010–2011 activity honestly: no random chart
+values, seeded prose, hidden model fallbacks, or invented confidence scores.
 
-## What runs locally
+## Product story
 
-| Service | Address | Purpose |
-| --- | --- | --- |
-| React/Vite | http://localhost:3000 | Dashboard UI and `/api` development proxy |
-| Node/Express | http://localhost:5000 | Metrics, insights, and ML API |
-| Python/Flask | http://localhost:8000 | Prediction and anomaly models |
-| PostgreSQL | localhost:5433 | Development data store |
+The original demo exposed isolated metric snapshots and generated both its charts
+and forecast history with random numbers. That made its “AI-powered” claim
+impossible to audit. This rebuild treats trust as part of the interface:
 
-PostgreSQL intentionally uses host port 5433 so it does not collide with a
-system PostgreSQL installation on the default port.
+- every KPI reconciles to cleaned sales transactions;
+- forecasts are evaluated using rolling time-series splits and compared with a
+  same-weekday seasonal baseline;
+- anomalies include observed and expected values plus their detection method;
+- insight text is deterministic and cites its evidence, period, and model version;
+- filtered segments withhold forecasts and generalized insights until separately
+  validated.
 
-## Prerequisites
+## Architecture
 
-- Node.js 18 or newer
-- Python 3.9 or newer with the `venv` module (`python3-venv` on Debian/Ubuntu)
-- Docker with Docker Compose
+```text
+UCI workbook → Python pipeline → versioned aggregate/model artifact → PostgreSQL
+                                                                      ↓
+React editorial dashboard ← typed dashboard contract ← Express / Vercel API
+```
 
-## First-time setup
+Python is an offline, reproducible analytics pipeline—not a fragile runtime
+microservice. The committed `database/portfolio_seed.json` lets reviewers run the
+case study without downloading the source workbook. `python-ml/pipeline.py`
+recreates that artifact from the official source.
+
+## Analytics methodology
+
+Cleaning excludes cancelled invoices, non-positive quantities, non-positive unit
+prices, and invalid timestamps. Sales revenue is `quantity × unit price` for the
+remaining lines. Orders are distinct invoices. Customer measures include only
+records with a supplied customer ID and de-duplicate those IDs over the selected
+period.
+
+The 30-day revenue forecast uses random-forest regression with lag 1/7/14/28,
+rolling 7/28-day values, trend, weekday, and month features. Four rolling
+time-series splits produce MAE, WAPE, and a held-out residual interval. The
+generated artifact scores **31.88% WAPE**, compared with **38.09%** for the
+7-day seasonal baseline. This is a small historical dataset, not a production
+demand model; promotions, stock, holidays, and acquisition activity are absent.
+
+Anomalies compare each day with an eight-week same-weekday median and use robust
+median absolute deviation thresholds. These are statistical signals, not causal
+claims.
+
+## Run locally
+
+Requirements: Node.js 18+, Python 3.9+, and Docker Compose.
 
 ```bash
 npm run setup
-```
-
-This installs all Node dependencies, creates `python-ml/.venv`, starts the
-database container, applies the schema, and loads the explicit demo seed data.
-Seeding resets the dashboard tables, so run it only when that is intended.
-
-If you prefer to perform each stage separately:
-
-```bash
-npm run install:all
-npm run python:setup
-npm run db:setup
-```
-
-The checked-in `.env.example` files document every setting. Development
-defaults already match Docker Compose; copy an example to `.env` only when you
-need to recreate or customize a local file.
-
-## Run the application
-
-Ensure the database is running, then launch all application services:
-
-```bash
-npm run db:up
 npm run dev
 ```
 
-Press Ctrl+C once to stop the frontend, API, and ML processes together. The
-database remains available between sessions. Stop it separately with:
+The app runs at `http://localhost:3000`; the API runs at
+`http://localhost:5000`. The setup command installs dependencies, starts
+PostgreSQL, applies the schema, and loads the committed artifact.
+
+Useful commands:
 
 ```bash
-npm run db:down
-```
-
-## Common commands
-
-```bash
-npm run dev              # frontend + API + ML service
-npm run build            # production TypeScript/Vite builds
-npm run db:migrate       # apply idempotent schema changes
-npm run db:seed          # reset and reload demo records
-npm run dev:frontend     # run only Vite
-npm run dev:backend      # run only Express
-npm run dev:ml           # run only Flask using the project venv
+npm test                 # Python, API-contract, and frontend behavior tests
+npm run build            # production frontend and backend builds
+npm run data:build       # download UCI data and regenerate the artifact
+npm run db:seed          # reload the generated artifact into PostgreSQL
 ```
 
 ## API
 
-### Health
+- `GET /api/dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD&country=...`
+- `GET /api/model-card`
+- `GET /api/health` (local Express runtime)
 
-- `GET /api/health`
-- Python service: `GET http://localhost:8000/health`
+Invalid filters return `400`, empty slices return `404`, and a missing analytics
+artifact returns `503`. The API never substitutes fabricated results.
 
-### Metrics and insights
+## Deployment
 
-- `GET /api/metrics`
-- `GET /api/metrics/:id`
-- `PUT /api/metrics/:id` with one or more of `value`, `change`, and `trend`
-- `GET /api/ml/insights`
+The frontend and serverless API are configured for Vercel. Set `DATABASE_URL` to
+a pooled Neon PostgreSQL connection, apply `database/schema.sql`, and load the
+artifact with `npm run db:seed`. Local development uses the same artifact and
+contract through Express.
 
-### Machine learning
+## Data license and attribution
 
-```http
-POST /api/ml/predict
-Content-Type: application/json
-
-{"metricIds":["metric-id"]}
-```
-
-```http
-POST /api/ml/anomaly-detection
-Content-Type: application/json
-
-{"data":[100,105,98,150,102]}
-```
-
-The Node API validates requests, loads metric values from PostgreSQL, and calls
-the Python service. If Python is unavailable, ML endpoints return `502` rather
-than fabricated data.
-
-## Troubleshooting
-
-- `docker: command not found`: install Docker and its Compose plugin, then rerun
-  `npm run db:setup`.
-- API exits on startup: verify the database is healthy with `docker compose ps`
-  and confirm `backend/.env` uses port 5433.
-- ML service will not start: rerun `npm run python:setup`.
-- Dashboard stays on loading: check `http://localhost:5000/api/health`, then the
-  API terminal for database errors.
+Chen, D. (2015). *Online Retail* [Dataset]. UCI Machine Learning Repository.
+[DOI 10.24432/C5BW33](https://doi.org/10.24432/C5BW33). Licensed CC BY 4.0.
+The raw workbook is intentionally not committed.

@@ -1,177 +1,84 @@
 import http from 'http'
-import axios from 'axios'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import express, { NextFunction, Request, Response } from 'express'
 import { initializeDatabase, pool, query } from './database/connection'
 
 dotenv.config()
-
 const app = express()
 const port = Number(process.env.PORT || 5000)
-const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://localhost:8000'
-
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000' }))
 app.use(express.json({ limit: '1mb' }))
 
-type DatabaseRow = Record<string, unknown>
+type Daily = { date:string; country:string; revenue:number; orders:number; customers:number; newCustomers:number; returningCustomers:number }
+type Product = { date:string; country:string; stock_code:string; description:string; revenue:number; units:number }
+type Customer = { date:string;country:string;invoice:string;customer_id:string;is_new:boolean }
+type Artifact = { metadata:Record<string, unknown>; daily:Daily[]; products:Product[]; customers:Customer[]; forecasts:unknown[]; anomalies:Array<{date:string}>; insights:unknown[]; modelCard:Record<string, unknown> }
 
-const numberValue = (value: unknown): number => Number(value)
-
-function serializeMetric(row: DatabaseRow) {
-  return {
-    id: row.id,
-    name: row.name,
-    value: numberValue(row.value),
-    unit: row.unit,
-    change: numberValue(row.change),
-    trend: row.trend,
-    timestamp: row.timestamp,
-  }
+async function artifact(): Promise<Artifact> {
+  const result = await query('SELECT payload FROM analytics_artifacts ORDER BY generated_at DESC LIMIT 1')
+  if (!result.rowCount) throw Object.assign(new Error('Analytics artifact unavailable'), { status: 503 })
+  return result.rows[0].payload as Artifact
 }
 
-function serializeInsight(row: DatabaseRow) {
-  return {
-    id: row.id,
-    type: row.type,
-    title: row.title,
-    description: row.description,
-    confidence: numberValue(row.confidence),
-    timestamp: row.timestamp,
-    data: row.data ?? undefined,
-  }
+function dateValue(value: unknown, fallback: string): string {
+  if (value === undefined) return fallback
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value)))
+    throw Object.assign(new Error('Dates must use YYYY-MM-DD'), { status: 400 })
+  return value
 }
 
-const asyncRoute = (
-  handler: (req: Request, res: Response) => Promise<unknown>
-) => (req: Request, res: Response, next: NextFunction) => {
-  Promise.resolve(handler(req, res)).catch(next)
+function pct(current:number, previous:number) { return previous ? (current - previous) / previous * 100 : null }
+function round(value:number, places=2) { const power=10**places; return Math.round(value*power)/power }
+function sum<T>(rows:T[], pick:(row:T)=>number) { return rows.reduce((total,row)=>total+pick(row),0) }
+
+async function dashboard(req:Request, res:Response) {
+  const data = await artifact()
+  const min = String(data.metadata.startDate), max = String(data.metadata.endDate)
+  const from = dateValue(req.query.from, min), to = dateValue(req.query.to, max)
+  if (from > to || from < min || to > max) return res.status(400).json({ error: `Date range must be between ${min} and ${max}` })
+  const countries = [...new Set(data.daily.map(row=>row.country))].sort()
+  const country = typeof req.query.country === 'string' && req.query.country !== 'All' ? req.query.country : null
+  if (country && !countries.includes(country)) return res.status(400).json({ error: 'Unknown country' })
+  const selected = data.daily.filter(row=>row.date>=from && row.date<=to && (!country || row.country===country))
+  if (!selected.length) return res.status(404).json({ error:'No transactions match these filters' })
+  const days = Math.round((Date.parse(to)-Date.parse(from))/86400000)+1
+  const previousTo = new Date(Date.parse(from)-86400000).toISOString().slice(0,10)
+  const previousFrom = new Date(Date.parse(from)-days*86400000).toISOString().slice(0,10)
+  const previous = data.daily.filter(row=>row.date>=previousFrom && row.date<=previousTo && (!country || row.country===country))
+  const customerRows = data.customers.filter(row=>row.date>=from&&row.date<=to&&(!country||row.country===country))
+  const previousCustomerRows = data.customers.filter(row=>row.date>=previousFrom&&row.date<=previousTo&&(!country||row.country===country))
+  const aggregate = (rows:Daily[], people:Customer[]) => {
+    const revenue=sum(rows,r=>r.revenue), orders=sum(rows,r=>r.orders)
+    return { revenue, orders, customers:new Set(people.map(r=>r.customer_id)).size, averageOrderValue:orders?revenue/orders:0 }
+  }
+  const current=aggregate(selected,customerRows), before=aggregate(previous,previousCustomerRows)
+  const kpis = (['revenue','orders','customers','averageOrderValue'] as const).map(key=>({ key, value:round(current[key]), comparisonPercent:previous.length?pct(current[key],before[key]):null }))
+  const byDate = new Map<string,Daily>()
+  selected.forEach(row=>{ const current=byDate.get(row.date)||{date:row.date,country:'',revenue:0,orders:0,customers:0,newCustomers:0,returningCustomers:0}; Object.keys(current).forEach(()=>{}); current.revenue+=row.revenue; current.orders+=row.orders; current.customers+=row.customers; current.newCustomers+=row.newCustomers; current.returningCustomers+=row.returningCustomers; byDate.set(row.date,current) })
+  const byCountry = new Map<string,{country:string;revenue:number;orders:number}>()
+  data.daily.filter(row=>row.date>=from&&row.date<=to&&(!country||row.country===country)).forEach(row=>{const value=byCountry.get(row.country)||{country:row.country,revenue:0,orders:0};value.revenue+=row.revenue;value.orders+=row.orders;byCountry.set(row.country,value)})
+  const productMap = new Map<string,{stockCode:string;name:string;revenue:number;units:number}>()
+  data.products.filter(row=>row.date>=from&&row.date<=to&&(!country||row.country===country)).forEach(row=>{const value=productMap.get(row.stock_code)||{stockCode:row.stock_code,name:row.description,revenue:0,units:0};value.revenue+=row.revenue;value.units+=row.units;productMap.set(row.stock_code,value)})
+  const fullRange = from===min && to===max && !country
+  res.json({ meta:{...data.metadata,from,to,country:country||'All',generatedAt:data.metadata.generatedAt,isStale:false}, filters:{countries}, kpis,
+    revenueSeries:[...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date)).map(({date,revenue})=>({date,revenue:round(revenue)})),
+    forecasts:fullRange?data.forecasts:[], anomalies:data.anomalies.filter(row=>row.date>=from&&row.date<=to),
+    countries:[...byCountry.values()].sort((a,b)=>b.revenue-a.revenue).slice(0,8).map(row=>({...row,revenue:round(row.revenue)})),
+    customerMix:{new:customerRows.filter(r=>r.is_new).length,returning:customerRows.filter(r=>!r.is_new).length},
+    products:[...productMap.values()].sort((a,b)=>b.revenue-a.revenue).slice(0,8).map(row=>({...row,revenue:round(row.revenue)})),
+    insights:fullRange?data.insights:[] })
 }
 
-const healthHandler = (_req: Request, res: Response) => {
-  res.json({ status: 'ok', service: 'api', timestamp: new Date().toISOString() })
-}
+const asyncRoute=(handler:(req:Request,res:Response)=>Promise<unknown>)=>(req:Request,res:Response,next:NextFunction)=>Promise.resolve(handler(req,res)).catch(next)
+app.get('/health',(_req,res)=>res.json({status:'ok',service:'api'}))
+app.get('/api/health',(_req,res)=>res.json({status:'ok',service:'api'}))
+app.get('/api/dashboard',asyncRoute(dashboard))
+app.get('/api/model-card',asyncRoute(async(_req,res)=>res.json((await artifact()).modelCard)))
+app.use('/api',(_req,res)=>res.status(404).json({error:'Endpoint not found'}))
+app.use((error:Error&{status?:number},_req:Request,res:Response,_next:NextFunction)=>{console.error(error);res.status(error.status||500).json({error:error.status?error.message:'Internal server error'})})
 
-app.get('/health', healthHandler)
-app.get('/api/health', healthHandler)
-
-app.get('/api/metrics', asyncRoute(async (_req, res) => {
-  const result = await query('SELECT * FROM metrics ORDER BY timestamp DESC LIMIT 100')
-  res.json(result.rows.map((row) => serializeMetric(row as DatabaseRow)))
-}))
-
-app.get('/api/metrics/:id', asyncRoute(async (req, res) => {
-  const result = await query('SELECT * FROM metrics WHERE id = $1', [req.params.id])
-  if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Metric not found' })
-  }
-  res.json(serializeMetric(result.rows[0] as DatabaseRow))
-}))
-
-app.put('/api/metrics/:id', asyncRoute(async (req, res) => {
-  const { value, change, trend } = req.body ?? {}
-  if (value === undefined && change === undefined && trend === undefined) {
-    return res.status(400).json({ error: 'At least one of value, change, or trend is required' })
-  }
-  if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value))) {
-    return res.status(400).json({ error: 'value must be a finite number' })
-  }
-  if (change !== undefined && (typeof change !== 'number' || !Number.isFinite(change))) {
-    return res.status(400).json({ error: 'change must be a finite number' })
-  }
-  if (trend !== undefined && !['up', 'down', 'stable'].includes(trend)) {
-    return res.status(400).json({ error: 'trend must be one of: up, down, stable' })
-  }
-
-  const result = await query(
-    `UPDATE metrics
-     SET value = COALESCE($1, value), change = COALESCE($2, change),
-         trend = COALESCE($3, trend), updated_at = NOW(), timestamp = NOW()
-     WHERE id = $4 RETURNING *`,
-    [value ?? null, change ?? null, trend ?? null, req.params.id]
-  )
-  if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Metric not found' })
-  }
-  res.json(serializeMetric(result.rows[0] as DatabaseRow))
-}))
-
-app.get('/api/ml/insights', asyncRoute(async (_req, res) => {
-  const result = await query('SELECT * FROM ml_insights ORDER BY timestamp DESC LIMIT 20')
-  res.json(result.rows.map((row) => serializeInsight(row as DatabaseRow)))
-}))
-
-app.post('/api/ml/predict', asyncRoute(async (req, res) => {
-  const { metricIds } = req.body ?? {}
-  if (!Array.isArray(metricIds) || metricIds.length === 0 ||
-      !metricIds.every((id: unknown) => typeof id === 'string' && id.trim())) {
-    return res.status(400).json({ error: 'metricIds must be a non-empty array of strings' })
-  }
-
-  const result = await query('SELECT id, value FROM metrics WHERE id = ANY($1::text[])', [metricIds])
-  if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'No metrics found' })
-  }
-  const response = await axios.post(`${mlServiceUrl}/predict`, {
-    metrics: result.rows.map((row) => ({ id: row.id, value: numberValue(row.value) })),
-  }, { timeout: 10000 })
-  res.json(response.data)
-}))
-
-app.post('/api/ml/anomaly-detection', asyncRoute(async (req, res) => {
-  const { data } = req.body ?? {}
-  if (!Array.isArray(data) || data.length === 0 ||
-      !data.every((value: unknown) => typeof value === 'number' && Number.isFinite(value))) {
-    return res.status(400).json({ error: 'data must be a non-empty array of finite numbers' })
-  }
-  const response = await axios.post(`${mlServiceUrl}/detect-anomalies`, { data }, { timeout: 10000 })
-  const timestamp = new Date().toISOString()
-  const anomalies = (response.data as DatabaseRow[]).map((anomaly) => ({
-    id: anomaly.id,
-    metricId: `metric-${anomaly.index}`,
-    value: numberValue(anomaly.value),
-    expectedValue: numberValue(anomaly.expectedValue),
-    severity: anomaly.severity,
-    timestamp,
-  }))
-  res.json(anomalies)
-}))
-
-const methodNotAllowed = (_req: Request, res: Response) => {
-  res.status(405).json({ error: 'Method not allowed' })
-}
-
-app.all('/api/health', methodNotAllowed)
-app.all('/api/metrics', methodNotAllowed)
-app.all('/api/metrics/:id', methodNotAllowed)
-app.all('/api/ml/insights', methodNotAllowed)
-app.all('/api/ml/predict', methodNotAllowed)
-app.all('/api/ml/anomaly-detection', methodNotAllowed)
-app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }))
-
-app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(error)
-  if (axios.isAxiosError(error)) {
-    return res.status(502).json({ error: 'ML service unavailable' })
-  }
-  res.status(500).json({ error: 'Internal server error' })
-})
-
-let server: http.Server
-
-initializeDatabase()
-  .then(() => {
-    server = app.listen(port, () => console.log(`API listening on http://localhost:${port}`))
-  })
-  .catch(() => process.exit(1))
-
-async function shutdown() {
-  if (server) {
-    await new Promise<void>((resolve) => server.close(() => resolve()))
-  }
-  await pool.end()
-  process.exit(0)
-}
-
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
+let server:http.Server
+initializeDatabase().then(()=>{server=app.listen(port,()=>console.log(`API listening on http://localhost:${port}`))}).catch(()=>process.exit(1))
+async function shutdown(){if(server)await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();process.exit(0)}
+process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown)
