@@ -32,14 +32,13 @@
   ],
   "author": "",
   "license": "MIT",
-  "dependencies": {
-    "@neondatabase/serverless": "^1.1.0"
-  },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "@types/pg": "^8.10.9",
     "@vercel/node": "^5.8.22",
     "concurrently": "^8.2.2",
     "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "mongodb": "^6.21.0"
   }
 }

@@ -1,10 +1,10 @@
-import { query } from './db'
+import { getDatabase } from './db'
 
 export type Daily={date:string;country:string;revenue:number;orders:number;customers:number;newCustomers:number;returningCustomers:number}
 export type Product={date:string;country:string;stock_code:string;description:string;revenue:number;units:number}
 export type Customer={date:string;country:string;invoice:string;customer_id:string;is_new:boolean}
 export type Artifact={metadata:Record<string,unknown>;daily:Daily[];products:Product[];customers:Customer[];forecasts:unknown[];anomalies:Array<{date:string}>;insights:unknown[];modelCard:Record<string,unknown>}
-export async function latestArtifact():Promise<Artifact>{const result=await query('SELECT payload FROM analytics_artifacts ORDER BY generated_at DESC LIMIT 1');if(!result.rowCount)throw new Error('ARTIFACT_UNAVAILABLE');return (result.rows[0] as {payload:Artifact}).payload}
+export async function latestArtifact():Promise<Artifact>{const db=await getDatabase();const document=await db.collection<{payload:Artifact}>('analytics_artifacts').findOne({}, {sort:{generatedAt:-1},projection:{payload:1}});if(!document)throw new Error('ARTIFACT_UNAVAILABLE');return document.payload}
 const sum=<T>(rows:T[],pick:(row:T)=>number)=>rows.reduce((total,row)=>total+pick(row),0)
 const round=(value:number)=>Math.round(value*100)/100
 const validDate=(value:unknown,fallback:string)=>{if(value===undefined)return fallback;if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)||Number.isNaN(Date.parse(value)))throw new Error('INVALID_DATE');return value}

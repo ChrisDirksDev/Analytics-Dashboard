@@ -1,24 +1,16 @@
-import { readFileSync } from 'fs'
-import { join } from 'path'
-import { query } from './connection'
+import { closeDatabase, collection, initializeDatabase } from './connection'
 
 async function migrate() {
-  try {
-    console.log('🔄 Running database migrations...')
-    
-    const schemaPath = join(__dirname, 'schema.sql')
-    const schema = readFileSync(schemaPath, 'utf-8')
-    
-    // Execute schema SQL
-    await query(schema)
-    
-    console.log('✅ Database migrations completed successfully')
-    process.exit(0)
-  } catch (error) {
-    console.error('❌ Migration failed:', error)
-    process.exit(1)
-  }
+  await initializeDatabase()
+  const artifacts = collection('analytics_artifacts')
+  await artifacts.createIndex({ artifactId: 1 }, { name: 'artifactId_unique', unique: true })
+  await artifacts.createIndex({ generatedAt: -1 }, { name: 'generatedAt_desc' })
+  console.log('✅ MongoDB indexes created')
+  await closeDatabase()
 }
 
-migrate()
-
+migrate().catch(async (error) => {
+  console.error('❌ Migration failed:', error)
+  await closeDatabase()
+  process.exit(1)
+})

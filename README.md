@@ -22,8 +22,8 @@ impossible to audit. This rebuild treats trust as part of the interface:
 ## Architecture
 
 ```text
-UCI workbook → Python pipeline → versioned aggregate/model artifact → PostgreSQL
-                                                                      ↓
+UCI workbook → Python pipeline → versioned aggregate/model artifact → MongoDB
+                                                                    ↓
 React editorial dashboard ← typed dashboard contract ← Express / Vercel API
 ```
 
@@ -62,7 +62,7 @@ npm run dev
 
 The app runs at `http://localhost:3000`; the API runs at
 `http://localhost:5000`. The setup command installs dependencies, starts
-PostgreSQL, applies the schema, and loads the committed artifact.
+MongoDB, creates its indexes, and loads the committed artifact.
 
 Useful commands:
 
@@ -70,7 +70,7 @@ Useful commands:
 npm test                 # Python, API-contract, and frontend behavior tests
 npm run build            # production frontend and backend builds
 npm run data:build       # download UCI data and regenerate the artifact
-npm run db:seed          # reload the generated artifact into PostgreSQL
+npm run db:seed          # reload the generated artifact into MongoDB
 ```
 
 ## API
@@ -84,10 +84,11 @@ artifact returns `503`. The API never substitutes fabricated results.
 
 ## Deployment
 
-The frontend and serverless API are configured for Vercel. Set `DATABASE_URL` to
-a pooled Neon PostgreSQL connection, apply `database/schema.sql`, and load the
-artifact with `npm run db:seed`. Local development uses the same artifact and
-contract through Express.
+The frontend and serverless API are configured for Vercel. Set `MONGODB_URI` to
+your MongoDB connection string and, optionally, `MONGODB_DB` (defaults to
+`analytics_dashboard`). Run `npm run db:migrate` to create indexes and
+`npm run db:seed` to load the artifact. Local development uses the same artifact
+and contract through Express.
 
 ## Data license and attribution
 

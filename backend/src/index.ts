@@ -2,7 +2,7 @@ import http from 'http'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import express, { NextFunction, Request, Response } from 'express'
-import { initializeDatabase, pool, query } from './database/connection'
+import { closeDatabase, collection, initializeDatabase } from './database/connection'
 
 dotenv.config()
 const app = express()
@@ -16,9 +16,10 @@ type Customer = { date:string;country:string;invoice:string;customer_id:string;i
 type Artifact = { metadata:Record<string, unknown>; daily:Daily[]; products:Product[]; customers:Customer[]; forecasts:unknown[]; anomalies:Array<{date:string}>; insights:unknown[]; modelCard:Record<string, unknown> }
 
 async function artifact(): Promise<Artifact> {
-  const result = await query('SELECT payload FROM analytics_artifacts ORDER BY generated_at DESC LIMIT 1')
-  if (!result.rowCount) throw Object.assign(new Error('Analytics artifact unavailable'), { status: 503 })
-  return result.rows[0].payload as Artifact
+  const document = await collection<{ payload: Artifact; generatedAt: Date }>('analytics_artifacts')
+    .findOne({}, { sort: { generatedAt: -1 }, projection: { payload: 1 } })
+  if (!document) throw Object.assign(new Error('Analytics artifact unavailable'), { status: 503 })
+  return document.payload
 }
 
 function dateValue(value: unknown, fallback: string): string {
@@ -80,5 +81,5 @@ app.use((error:Error&{status?:number},_req:Request,res:Response,_next:NextFuncti
 
 let server:http.Server
 initializeDatabase().then(()=>{server=app.listen(port,()=>console.log(`API listening on http://localhost:${port}`))}).catch(()=>process.exit(1))
-async function shutdown(){if(server)await new Promise<void>(resolve=>server.close(()=>resolve()));await pool.end();process.exit(0)}
+async function shutdown(){if(server)await new Promise<void>(resolve=>server.close(()=>resolve()));await closeDatabase();process.exit(0)}
 process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown)

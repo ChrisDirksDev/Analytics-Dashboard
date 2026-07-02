@@ -1,47 +1,26 @@
-import { Pool, PoolClient, QueryResult } from 'pg'
+import { Collection, Db, MongoClient } from 'mongodb'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
-// Validate DATABASE_URL is provided
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    'DATABASE_URL environment variable is required. ' +
-    'Format: postgresql://user:password@host:port/database'
-  )
-}
+const uri = process.env.MONGODB_URI || (process.env.NODE_ENV !== 'production' ? 'mongodb://localhost:27017' : '')
+if (!uri) throw new Error('MONGODB_URI environment variable is required in production')
 
-// Create connection pool using connection string
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-})
+export const client = new MongoClient(uri, { maxPoolSize: 20 })
+let database: Db | undefined
 
-// Test connection
 export async function initializeDatabase(): Promise<void> {
-  try {
-    const client = await pool.connect()
-    console.log('✅ Database connection established')
-    client.release()
-  } catch (error) {
-    console.error('❌ Database connection failed:', error)
-    throw error
-  }
+  await client.connect()
+  database = client.db(process.env.MONGODB_DB || 'analytics_dashboard')
+  await database.command({ ping: 1 })
+  console.log('✅ MongoDB connection established')
 }
 
-// Helper function to execute queries
-export async function query(text: string, params?: unknown[]): Promise<QueryResult> {
-  const start = Date.now()
-  try {
-    const res = await pool.query(text, params)
-    const duration = Date.now() - start
-    console.log('Executed query', { text, duration, rows: res.rowCount })
-    return res
-  } catch (error) {
-    console.error('Query error', { text, error })
-    throw error
-  }
+export function collection<T extends object>(name: string): Collection<T> {
+  if (!database) throw new Error('Database has not been initialized')
+  return database.collection<T>(name)
 }
 
+export async function closeDatabase(): Promise<void> {
+  await client.close()
+}
